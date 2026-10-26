@@ -1,0 +1,24 @@
+# Dependências
+node_modules/
+
+# Arquivos gerados
+dist/
+.next/
+out/
+coverage/
+*.tsbuildinfo
+
+# Configurações locais
+.env
+.env.*
+!.env.example
+
+# Documentos recebidos
+uploads/
+
+# Logs
+*.log
+
+# Arquivos do sistema operacional
+.DS_Store
+Thumbs.db

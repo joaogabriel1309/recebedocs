@@ -28,6 +28,10 @@ export default function ListaDocumentos({ documentos, podeValidar = false }: Pro
               Tamanho
             </th>
 
+            <th scope="col" className="py-3 pr-4">
+              Status
+            </th>
+
             <th scope="col" className="py-3">
               Ação
             </th>
@@ -50,6 +54,20 @@ export default function ListaDocumentos({ documentos, podeValidar = false }: Pro
                   { maximumFractionDigits: 1 },
                 )}{' '}
                 KB
+              </td>
+
+              <td className="py-3 pr-4">
+                <span
+                  className={
+                    documento.validado
+                      ? 'inline-block text-green-800'
+                      : 'inline-block text-amber-800'
+                  }
+                >
+                  {documento.validado
+                    ? 'Documento validado'
+                    : 'Aguardando validação'}
+                </span>
               </td>
 
               <td className="whitespace-nowrap py-3">

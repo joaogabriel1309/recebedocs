@@ -9,10 +9,30 @@ datasource db {
   provider = "postgresql"
 }
 
+enum Perfil {
+  USUARIO
+  ADMIN
+}
+
+model Usuario {
+  id         String      @id @default(uuid()) @db.Uuid
+  nome       String
+  email      String      @unique
+  senhaHash  String
+  perfil     Perfil      @default(USUARIO)
+  criadoEm   DateTime    @default(now())
+  documentos Documento[]
+}
+
 model Documento {
   id           String   @id @default(uuid()) @db.Uuid
   nomeOriginal String
   key          String   @unique
   tamanho      Int
   criadoEm     DateTime @default(now())
+
+  usuarioId String?  @db.Uuid
+  usuario   Usuario? @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
+
+  @@index([usuarioId, criadoEm])
 }

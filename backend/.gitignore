@@ -1,0 +1,11 @@
+node_modules
+# Keep environment variables out of version control
+.env
+
+/src/generated/prisma
+
+# Local assistant skills installed by Prisma
+/.agents/skills/prisma-*/
+/.claude/skills/prisma-*/
+/.windsurf/skills/prisma-*/
+/skills-lock.json

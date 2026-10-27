@@ -6,6 +6,7 @@ import {
   listarDocumentos,
   listarDocumentosPorUsuario,
 } from '@/lib/documentos';
+import FormularioEnvio from '@/components/formulario-envio';
 
 async function DocumentosUsuario() {
   const documentos = await listarDocumentos();
@@ -112,7 +113,13 @@ async function ConteudoPainel() {
         </form>
       </header>
 
-      <Suspense fallback={<p className="mt-8">Carregando documentos...</p>}>
+      {usuario.perfil === 'USUARIO' && (
+        <FormularioEnvio />
+      )}
+
+      <Suspense
+        fallback={<p className="mt-8">Carregando documentos...</p>}
+      >
         {usuario.perfil === 'ADMIN' ? (
           <DocumentosAdmin />
         ) : (

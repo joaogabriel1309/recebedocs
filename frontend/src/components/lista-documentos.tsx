@@ -1,0 +1,69 @@
+import type { DocumentoResumo } from '@/lib/documentos';
+
+type Props = {
+  documentos: DocumentoResumo[];
+};
+
+export default function ListaDocumentos({ documentos }: Props) {
+  if (documentos.length === 0) {
+    return (
+      <p className="text-sm text-zinc-600">
+        Nenhum documento enviado.
+      </p>
+    );
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-left text-sm">
+        <thead className="border-b border-zinc-200">
+          <tr>
+            <th scope="col" className="py-3 pr-4">
+              Arquivo
+            </th>
+
+            <th scope="col" className="py-3 pr-4">
+              Tamanho
+            </th>
+
+            <th scope="col" className="py-3">
+              Ação
+            </th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {documentos.map((documento) => (
+            <tr
+              key={documento.id}
+              className="border-b border-zinc-100"
+            >
+              <td className="break-all py-3 pr-4">
+                {documento.nomeOriginal}
+              </td>
+
+              <td className="whitespace-nowrap py-3 pr-4">
+                {(documento.tamanho / 1024).toLocaleString(
+                  'pt-BR',
+                  { maximumFractionDigits: 1 },
+                )}{' '}
+                KB
+              </td>
+
+              <td className="whitespace-nowrap py-3">
+                <a
+                  href={`/documentos/${encodeURIComponent(documento.id)}/download`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium text-blue-700 underline"
+                >
+                  Abrir PDF
+                </a>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}

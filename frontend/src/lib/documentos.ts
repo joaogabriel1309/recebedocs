@@ -8,6 +8,7 @@ export type DocumentoResumo = {
   id: string;
   nomeOriginal: string;
   tamanho: number;
+  validado: boolean;
   criadoEm: string;
 };
 

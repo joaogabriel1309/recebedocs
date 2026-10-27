@@ -1,10 +1,12 @@
 import type { DocumentoResumo } from '@/lib/documentos';
+import BotaoValidarDocumento from './botao-validar-documento';
 
 type Props = {
   documentos: DocumentoResumo[];
+  podeValidar?: boolean;
 };
 
-export default function ListaDocumentos({ documentos }: Props) {
+export default function ListaDocumentos({ documentos, podeValidar = false }: Props) {
   if (documentos.length === 0) {
     return (
       <p className="text-sm text-zinc-600">
@@ -59,6 +61,12 @@ export default function ListaDocumentos({ documentos }: Props) {
                 >
                   Abrir PDF
                 </a>
+                {podeValidar && (
+                  <BotaoValidarDocumento
+                    id={documento.id}
+                    validado={documento.validado}
+                  />
+                )}
               </td>
             </tr>
           ))}

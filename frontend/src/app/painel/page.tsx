@@ -59,7 +59,10 @@ async function DocumentosAdmin() {
             Documentos enviados: {grupo.totalDocumentos}
           </p>
 
-          <ListaDocumentos documentos={grupo.documentos} />
+          <ListaDocumentos
+            documentos={grupo.documentos}
+            podeValidar
+          />
         </article>
       ))}
 
@@ -73,7 +76,10 @@ async function DocumentosAdmin() {
             Arquivos antigos que ainda não foram vinculados a uma conta.
           </p>
 
-          <ListaDocumentos documentos={semProprietario} />
+          <ListaDocumentos
+            documentos={semProprietario}
+            podeValidar
+          />
         </article>
       )}
     </section>

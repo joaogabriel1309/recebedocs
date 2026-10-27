@@ -10,6 +10,11 @@ export type EstadoEnvio = {
   sucesso: string;
 };
 
+export type EstadoValidacao = {
+  erro: string,
+  sucesso: string,
+}
+
 export async function enviarDocumento(
   _estadoAnterior: EstadoEnvio,
   formData: FormData,
@@ -98,5 +103,80 @@ export async function enviarDocumento(
   return {
     erro: '',
     sucesso: 'Documento enviado com sucesso!',
+  };
+}
+
+export async function validarDocumento(
+  _estadoAnterior: EstadoValidacao,
+  formData: FormData,
+): Promise<EstadoValidacao> {
+  const cookieStore = await cookies();
+  const token = cookieStore.get(COOKIE_TOKEN)?.value;
+
+  if (!token) {
+    redirect('/login');
+  }
+
+  const id = formData.get('id');
+
+  if (typeof id !== 'string' || !id.trim()) {
+    return {
+      erro: 'Documento inválido.',
+      sucesso: '',
+    };
+  }
+
+  let resposta: Response;
+
+  try {
+    resposta = await fetch(
+      urlApi(`/documentos/${encodeURIComponent(id)}/validado`),
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        cache: 'no-store',
+        signal: AbortSignal.timeout(10000),
+      },
+    );
+  } catch {
+    return {
+      erro: 'Não foi possível confirmar a validação. Atualize a lista.',
+      sucesso: '',
+    };
+  }
+
+  if (resposta.status === 401) {
+    cookieStore.delete(COOKIE_TOKEN);
+    redirect('/login');
+  }
+
+  if (resposta.status === 403) {
+    return {
+      erro: 'Somente administradores podem validar documentos.',
+      sucesso: '',
+    };
+  }
+
+  if (resposta.status === 404) {
+    return {
+      erro: 'Documento não encontrado.',
+      sucesso: '',
+    };
+  }
+
+  if (!resposta.ok) {
+    return {
+      erro: 'Não foi possível validar o documento.',
+      sucesso: '',
+    };
+  }
+
+  refresh();
+
+  return {
+    erro: '',
+    sucesso: 'Documento validado com sucesso.',
   };
 }

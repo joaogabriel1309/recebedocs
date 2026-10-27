@@ -34,6 +34,7 @@ export class AdminService {
             id: true,
             nomeOriginal: true,
             tamanho: true,
+            validado: true,
             criadoEm: true,
           },
         },

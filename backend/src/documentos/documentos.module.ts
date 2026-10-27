@@ -4,10 +4,11 @@ import { DocumentosService } from './documentos.service.js';
 import { StorageModule } from '../storage/storage.module.js';
 import { PrismaModule } from '../prisma/prisma.module.js';
 import { AuthModule } from '../auth/auth.module.js';
+import { AdminGuard } from '../admin/admin.guard.js';
 
 @Module({
   imports: [StorageModule, PrismaModule, AuthModule],
   controllers: [DocumentosController],
-  providers: [DocumentosService]
+  providers: [DocumentosService, AdminGuard]
 })
 export class DocumentosModule { }

@@ -2,7 +2,6 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { StorageService } from '../storage/storage.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { Documento, Perfil } from '../generated/prisma/client.js';
-import { error } from 'console';
 import type { UsuarioPublico } from '../auth/auth.service.js';
 
 @Injectable()
@@ -16,13 +15,14 @@ export class DocumentosService {
 
   buscarTodos(usuario: UsuarioPublico): Promise<Documento[]> {
     return this.prisma.documento.findMany({
-      where: usuario.perfil === Perfil.ADMIN
-        ? {}
-        : { usuarioId: usuario.id },
+      where:
+        usuario.perfil === Perfil.ADMIN
+          ? {}
+          : { usuarioId: usuario.id },
       orderBy: {
-        criadoEm: 'desc'
-      }
-    })
+        criadoEm: 'desc',
+      },
+    });
   }
 
   async criar(
@@ -81,5 +81,30 @@ export class DocumentosService {
       url: download.url,
       expiraEmSegundos: download.expiraEmSegundos,
     };
+  }
+
+  async validaDocumento(id: string, usuario: UsuarioPublico) {
+    if (usuario.perfil !== Perfil.ADMIN) {
+      throw new NotFoundException('Somente administradores podem validar documentos');
+    }
+
+    const documento = await this.prisma.documento.findUnique({
+      where: { id }
+    });
+
+    if (!documento) {
+      throw new NotFoundException('Documento não encontrado');
+    }
+
+    await this.prisma.documento.update({
+      where: { id },
+      data: {
+        validado: true,
+      },
+      select: {
+        id: true,
+        validado: true,
+      }
+    })
   }
 }

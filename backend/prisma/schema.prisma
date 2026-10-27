@@ -29,6 +29,7 @@ model Documento {
   nomeOriginal String
   key          String   @unique
   tamanho      Int
+  validado     Boolean  @default(false)
   criadoEm     DateTime @default(now())
 
   usuarioId String?  @db.Uuid

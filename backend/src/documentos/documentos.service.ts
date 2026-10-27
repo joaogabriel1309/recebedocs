@@ -1,8 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { StorageService } from '../storage/storage.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { Documento } from '../generated/prisma/client.js';
 import { error } from 'console';
+import { url } from 'inspector';
 
 @Injectable()
 export class DocumentosService {
@@ -40,5 +41,24 @@ export class DocumentosService {
       }
     }
     throw error;
+  }
+
+  async gerarDownload(id: string) {
+    const documento = await this.prisma.documento.findUnique({
+      where: { id }
+    });
+
+    if (!documento) {
+      throw new NotFoundException('Documento não encontrado');
+    }
+
+    const download = await this.storageService.gerarUrlDownload(documento.key);
+
+    return {
+      id: documento.id,
+      nomeOriginal: documento.nomeOriginal,
+      url: download.url,
+      expiraEmSegundos: download.expiraEmSegundos,
+    };
   }
 }

@@ -25,8 +25,12 @@ export class DocumentosService {
     })
   }
 
-  async criar(file: Express.Multer.File, usuario: UsuarioPublico): Promise<Documento> {
+  async criar(
+    file: Express.Multer.File,
+    usuario: UsuarioPublico,
+  ): Promise<Documento> {
     const key = await this.storageService.uploadPdf(file.buffer);
+
     try {
       return await this.prisma.documento.create({
         data: {
@@ -34,17 +38,24 @@ export class DocumentosService {
           key,
           tamanho: file.size,
           usuarioId: usuario.id,
-        }
+        },
       });
     } catch (erro) {
-      this.logger.error('Erro ao salvar o documento no banco, iniciado processo de limpeza.');
+      this.logger.error(
+        'Erro ao salvar o documento no banco. Iniciando limpeza.',
+      );
+
       try {
         await this.storageService.remover(key);
       } catch (erroLimpeza) {
-        this.logger.error(`Falha ao remover o arquivo ${key} após erro no banco`, erroLimpeza);
+        this.logger.error(
+          `Falha ao remover o arquivo ${key} após erro no banco`,
+          erroLimpeza,
+        );
       }
+
+      throw erro;
     }
-    throw error;
   }
 
   async gerarDownload(id: string, usuario: UsuarioPublico) {
@@ -52,7 +63,13 @@ export class DocumentosService {
       where: { id }
     });
 
-    if (!documento || (usuario.perfil === Perfil.ADMIN && documento.usuarioId !== usuario.id)) {
+    if (
+      !documento ||
+      (
+        usuario.perfil !== Perfil.ADMIN &&
+        documento.usuarioId !== usuario.id
+      )
+    ) {
       throw new NotFoundException('Documento não encontrado');
     }
 

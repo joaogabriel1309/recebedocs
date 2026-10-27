@@ -6,6 +6,7 @@ import { StorageModule } from './storage/storage.module.js';
 import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { AuthModule } from './auth/auth.module.js';
+import { AdminModule } from './admin/admin.module.js';
 
 @Module({
   imports: [
@@ -13,7 +14,8 @@ import { AuthModule } from './auth/auth.module.js';
     DocumentosModule,
     StorageModule,
     PrismaModule,
-    AuthModule
+    AuthModule,
+    AdminModule
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -1,16 +1,20 @@
-import { Controller, Get, Header, Param, ParseFilePipeBuilder, ParseUUIDPipe, Post, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { Controller, Get, Header, Param, ParseFilePipeBuilder, ParseUUIDPipe, Post, Req, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { DocumentosService } from './documentos.service.js';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard.js';
+import type { RequestAutenticada } from '../auth/jwt-auth.guard.js';
 
 @Controller('documentos')
+@UseGuards(JwtAuthGuard)
 export class DocumentosController {
   constructor(
     private readonly documentosService: DocumentosService,
   ) { }
 
   @Get()
-  buscarTodos() {
-    return this.documentosService.buscarTodos();
+  @Header('Cache-Control', 'no-store')
+  buscarTodos(@Req() request: RequestAutenticada) {
+    return this.documentosService.buscarTodos(request.usuario);
   }
 
   @Post()
@@ -29,13 +33,14 @@ export class DocumentosController {
         .build({ fileIsRequired: true }),
     )
     file: Express.Multer.File,
+    @Req() request: RequestAutenticada
   ) {
-    return this.documentosService.criar(file)
+    return this.documentosService.criar(file, request.usuario)
   }
 
   @Get(':id/download')
   @Header('Cache-control', 'no-store')
-  gerarDownload(@Param('id', ParseUUIDPipe) id: string) {
-    return this.documentosService.gerarDownload(id);
+  gerarDownload(@Param('id', ParseUUIDPipe) id: string, @Req() request: RequestAutenticada) {
+    return this.documentosService.gerarDownload(id, request.usuario,);
   }
 }

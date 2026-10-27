@@ -1,9 +1,9 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { StorageService } from '../storage/storage.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { Documento } from '../generated/prisma/client.js';
+import { Documento, Perfil } from '../generated/prisma/client.js';
 import { error } from 'console';
-import { url } from 'inspector';
+import type { UsuarioPublico } from '../auth/auth.service.js';
 
 @Injectable()
 export class DocumentosService {
@@ -14,15 +14,18 @@ export class DocumentosService {
     private readonly prisma: PrismaService,
   ) { }
 
-  buscarTodos(): Promise<Documento[]> {
+  buscarTodos(usuario: UsuarioPublico): Promise<Documento[]> {
     return this.prisma.documento.findMany({
+      where: usuario.perfil === Perfil.ADMIN
+        ? {}
+        : { usuarioId: usuario.id },
       orderBy: {
         criadoEm: 'desc'
       }
     })
   }
 
-  async criar(file: Express.Multer.File): Promise<Documento> {
+  async criar(file: Express.Multer.File, usuario: UsuarioPublico): Promise<Documento> {
     const key = await this.storageService.uploadPdf(file.buffer);
     try {
       return await this.prisma.documento.create({
@@ -30,6 +33,7 @@ export class DocumentosService {
           nomeOriginal: file.originalname,
           key,
           tamanho: file.size,
+          usuarioId: usuario.id,
         }
       });
     } catch (erro) {
@@ -43,12 +47,12 @@ export class DocumentosService {
     throw error;
   }
 
-  async gerarDownload(id: string) {
+  async gerarDownload(id: string, usuario: UsuarioPublico) {
     const documento = await this.prisma.documento.findUnique({
       where: { id }
     });
 
-    if (!documento) {
+    if (!documento || (usuario.perfil === Perfil.ADMIN && documento.usuarioId !== usuario.id)) {
       throw new NotFoundException('Documento não encontrado');
     }
 

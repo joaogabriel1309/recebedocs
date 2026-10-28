@@ -5,7 +5,9 @@ const nextConfig: NextConfig = {
   partialPrefetching: true,
   experimental: {
     serverActions: {
-      bodySizeLimit: '6mb',
+      // O envio em lote aceita até 20 MB de PDFs; a folga cobre o
+      // overhead do multipart/form-data.
+      bodySizeLimit: '21mb',
     },
   },
   turbopack: {

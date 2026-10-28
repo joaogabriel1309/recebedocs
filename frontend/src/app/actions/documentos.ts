@@ -15,7 +15,7 @@ export type EstadoValidacao = {
   sucesso: string,
 }
 
-export async function enviarDocumento(
+export async function enviarDocumentos(
   _estadoAnterior: EstadoEnvio,
   formData: FormData,
 ): Promise<EstadoEnvio> {
@@ -26,43 +26,58 @@ export async function enviarDocumento(
     redirect('/login');
   }
 
-  const arquivo = formData.get('file');
+  const arquivos = formData.getAll('files');
 
-  if (!(arquivo instanceof File) || arquivo.size === 0) {
+  if (arquivos.length === 0 || arquivos.length > 10) {
     return {
-      erro: 'Selecione um arquivo PDF válido.',
-      sucesso: '',
-    };
-  }
-
-  if (arquivo.size > 5 * 1024 * 1024) {
-    return {
-      erro: 'O arquivo deve ter no máximo 5 MB.',
-      sucesso: '',
-    };
-  }
-
-  if (!arquivo.name.toLowerCase().endsWith('.pdf')) {
-    return {
-      erro: 'Envie um arquivo com extensão .pdf.',
+      erro: 'Selecione de 1 a 10 PDFs por envio.',
       sucesso: '',
     };
   }
 
   const dados = new FormData();
-  dados.append('file', arquivo);
+  let tamanhoTotal = 0;
+
+  for (const arquivo of arquivos) {
+    if (!(arquivo instanceof File) || arquivo.size === 0) {
+      return {
+        erro: 'Selecione arquivos PDF válidos e não vazios.',
+        sucesso: '',
+      };
+    }
+
+    if (
+      arquivo.size > 5 * 1024 * 1024 ||
+      !arquivo.name.toLowerCase().endsWith('.pdf')
+    ) {
+      return {
+        erro: `${arquivo.name}: envie um PDF de até 5 MB.`,
+        sucesso: '',
+      };
+    }
+
+    tamanhoTotal += arquivo.size;
+    dados.append('files', arquivo);
+  }
+
+  if (tamanhoTotal > 20 * 1024 * 1024) {
+    return {
+      erro: 'A soma dos arquivos deve ser de até 20 MB.',
+      sucesso: '',
+    };
+  }
 
   let resposta: Response;
 
   try {
-    resposta = await fetch(urlApi('/documentos'), {
+    resposta = await fetch(urlApi('/documentos/lote'), {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
       },
       body: dados,
       cache: 'no-store',
-      signal: AbortSignal.timeout(60000),
+      signal: AbortSignal.timeout(120000),
     });
   } catch {
     return {
@@ -79,21 +94,22 @@ export async function enviarDocumento(
 
   if (resposta.status === 413) {
     return {
-      erro: 'O arquivo ultrapassou o limite permitido.',
+      erro: 'O limite é 5 MB por arquivo e 20 MB por envio.',
       sucesso: '',
     };
   }
 
   if (resposta.status === 400 || resposta.status === 422) {
     return {
-      erro: 'Arquivo inválido. Envie um PDF válido de até 5 MB.',
+      erro:
+        'Lote inválido. Confira se todos os arquivos são PDFs válidos e se há no máximo 10 arquivos.',
       sucesso: '',
     };
   }
 
   if (!resposta.ok) {
     return {
-      erro: 'Não foi possível salvar o documento. Tente novamente mais tarde.',
+      erro: 'Não foi possível salvar os documentos.',
       sucesso: '',
     };
   }
@@ -102,7 +118,10 @@ export async function enviarDocumento(
 
   return {
     erro: '',
-    sucesso: 'Documento enviado com sucesso!',
+    sucesso:
+      arquivos.length === 1
+        ? 'Documento enviado com sucesso!'
+        : `${arquivos.length} documentos enviados com sucesso!`,
   };
 }
 

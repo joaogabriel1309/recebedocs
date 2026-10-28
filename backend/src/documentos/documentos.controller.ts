@@ -1,6 +1,6 @@
-import { Controller, Get, Header, HttpCode, Param, ParseFilePipeBuilder, ParseUUIDPipe, Post, Req, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { Controller, Get, Header, HttpCode, Param, ParseFilePipeBuilder, ParseUUIDPipe, Post, Req, UploadedFile, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
 import { DocumentosService } from './documentos.service.js';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard.js';
 import type { RequestAutenticada } from '../auth/jwt-auth.guard.js';
 import { AdminGuard } from '../admin/admin.guard.js';
@@ -37,6 +37,27 @@ export class DocumentosController {
     @Req() request: RequestAutenticada
   ) {
     return this.documentosService.criar(file, request.usuario)
+  }
+
+  @Post('lote')
+  @UseInterceptors(
+    FilesInterceptor('files', 10, {
+      limits: {
+        fileSize: 5 * 1024 * 1024,
+        files: 10,
+      },
+    }),
+  )
+  criarLote(
+    @UploadedFiles(
+      new ParseFilePipeBuilder()
+        .addFileTypeValidator({ fileType: 'application/pdf' })
+        .build({ fileIsRequired: true }),
+    )
+    files: Express.Multer.File[],
+    @Req() request: RequestAutenticada
+  ) {
+    return this.documentosService.criarLote(files, request.usuario);
   }
 
   @Get(':id/download')

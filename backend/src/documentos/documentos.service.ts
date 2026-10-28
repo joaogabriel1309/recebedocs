@@ -1,7 +1,7 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException, PayloadTooLargeException } from '@nestjs/common';
 import { StorageService } from '../storage/storage.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { Documento, Perfil } from '../generated/prisma/client.js';
+import { Documento, Perfil, Prisma } from '../generated/prisma/client.js';
 import type { UsuarioPublico } from '../auth/auth.service.js';
 
 @Injectable()
@@ -53,6 +53,83 @@ export class DocumentosService {
           erroLimpeza,
         );
       }
+
+      throw erro;
+    }
+  }
+
+  async criarLote(
+    files: Express.Multer.File[],
+    usuario: UsuarioPublico,
+  ): Promise<Documento[]> {
+    if (!files?.length || files.length > 10) {
+      throw new BadRequestException(
+        'Envie de 1 a 10 arquivos por vez',
+      );
+    }
+
+    if (files.some((file) => file.size === 0)) {
+      throw new BadRequestException(
+        'Não é permitido enviar arquivos vazios',
+      );
+    }
+
+    const tamanhoTotal = files.reduce(
+      (total, file) => total + file.size,
+      0,
+    );
+
+    if (
+      files.some((file) => file.size > 5 * 1024 * 1024) ||
+      tamanhoTotal > 20 * 1024 * 1024
+    ) {
+      throw new PayloadTooLargeException(
+        'O limite é 5 MB por arquivo e 20 MB por envio',
+      );
+    }
+
+    const chavesEnviadas: string[] = [];
+    const dados: Prisma.DocumentoCreateManyInput[] = [];
+
+    try {
+      for (const file of files) {
+        const key = await this.storageService.uploadPdf(
+          file.buffer,
+        );
+
+        chavesEnviadas.push(key);
+
+        dados.push({
+          nomeOriginal: file.originalname,
+          key,
+          tamanho: file.size,
+          usuarioId: usuario.id,
+        });
+      }
+
+      return await this.prisma.documento.createManyAndReturn({
+        data: dados,
+      });
+    } catch (erro) {
+      this.logger.error(
+        'Falha ao salvar o lote de documentos. Iniciando limpeza.',
+        erro,
+      );
+
+      const resultados = await Promise.allSettled(
+        chavesEnviadas.map((key) =>
+          this.storageService.remover(key),
+        ),
+      );
+
+      resultados.forEach((resultado, indice) => {
+        if (resultado.status === 'rejected') {
+          this.logger.error(
+            `Falha ao remover ${chavesEnviadas[indice]}`,
+            resultado.reason,
+          );
+        }
+      });
 
       throw erro;
     }

@@ -4,6 +4,7 @@ import { cookies } from 'next/headers';
 import { refresh } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { COOKIE_TOKEN, urlApi } from '@/lib/auth';
+import { ehIdDocumentoValido } from '@/lib/documentos';
 
 export type EstadoEnvio = {
   erro: string;
@@ -138,7 +139,7 @@ export async function validarDocumento(
 
   const id = formData.get('id');
 
-  if (typeof id !== 'string' || !id.trim()) {
+  if (!ehIdDocumentoValido(id)) {
     return {
       erro: 'Documento inválido.',
       sucesso: '',

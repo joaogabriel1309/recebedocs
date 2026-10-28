@@ -24,6 +24,14 @@ export type DocumentosPorUsuario = {
   documentos: DocumentoResumo[];
 };
 
+const FORMATO_UUID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Impede que um id como ".." altere o caminho da chamada à API.
+export function ehIdDocumentoValido(id: unknown): id is string {
+  return typeof id === 'string' && FORMATO_UUID.test(id);
+}
+
 async function consultarApi<T>(caminho: string): Promise<T> {
   const cookieStore = await cookies();
   const token = cookieStore.get(COOKIE_TOKEN)?.value;

@@ -1,100 +1,101 @@
 import type { DocumentoResumo } from '@/lib/documentos';
+import { formatarData, formatarTamanho } from '@/lib/formatar';
 import BotaoValidarDocumento from './botao-validar-documento';
+import SeloStatus from './selo-status';
+import { estilos } from './ui/estilos';
+import { IconeAbrir, IconeDocumento } from './ui/icones';
 
 type Props = {
   documentos: DocumentoResumo[];
   podeValidar?: boolean;
+  mensagemVazia?: string;
 };
 
-export default function ListaDocumentos({ documentos, podeValidar = false }: Props) {
+export default function ListaDocumentos({
+  documentos,
+  podeValidar = false,
+  mensagemVazia = 'Os PDFs enviados aparecerão aqui.',
+}: Props) {
   if (documentos.length === 0) {
     return (
-      <p className="text-sm text-zinc-600">
-        Nenhum documento enviado.
-      </p>
+      <div className="flex flex-col items-center rounded-xl border border-dashed border-zinc-300 px-6 py-10 text-center">
+        <span className="grid size-11 place-items-center rounded-full bg-zinc-100 text-zinc-500">
+          <IconeDocumento />
+        </span>
+
+        <p className="mt-3 font-medium text-zinc-900">
+          Nenhum documento enviado
+        </p>
+
+        <p className="mt-1 text-sm text-zinc-600">{mensagemVazia}</p>
+      </div>
     );
   }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-left text-sm">
-        <thead className="border-b border-zinc-200">
-          <tr>
-            <th scope="col" className="py-3 pr-4">
-              Arquivo
-            </th>
+    <ul className="divide-y divide-zinc-100">
+      {documentos.map((documento) => {
+        const data = formatarData(documento.criadoEm);
 
-            <th scope="col" className="py-3 pr-4">
-              Tamanho
-            </th>
+        return (
+          <li
+            key={documento.id}
+            className="flex flex-col gap-3 py-4 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:gap-4"
+          >
+            <div className="flex min-w-0 flex-1 items-start gap-3">
+              <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-red-50 text-red-700">
+                <IconeDocumento />
+              </span>
 
-            <th scope="col" className="py-3 pr-4">
-              Status
-            </th>
-
-            <th scope="col" className="py-3">
-              Ação
-            </th>
-          </tr>
-        </thead>
-
-        <tbody>
-          {documentos.map((documento) => (
-            <tr
-              key={documento.id}
-              className="border-b border-zinc-100"
-            >
-              <td className="break-all py-3 pr-4">
-                {documento.nomeOriginal}
-              </td>
-
-              <td className="whitespace-nowrap py-3 pr-4">
-                {(documento.tamanho / 1024).toLocaleString(
-                  'pt-BR',
-                  { maximumFractionDigits: 1 },
-                )}{' '}
-                KB
-              </td>
-
-              <td className="py-3 pr-4">
-                <span
-                  className={
-                    documento.validado
-                      ? 'inline-block text-green-800'
-                      : 'inline-block text-amber-800'
-                  }
+              <div className="min-w-0">
+                <p
+                  className="line-clamp-2 font-medium text-zinc-900 wrap-anywhere"
+                  title={documento.nomeOriginal}
                 >
-                  {documento.validado
-                    ? 'Documento validado'
-                    : 'Aguardando validação'}
+                  {documento.nomeOriginal}
+                </p>
+
+                <p className="mt-0.5 text-xs text-zinc-600">
+                  {formatarTamanho(documento.tamanho)}
+                  {data && (
+                    <>
+                      <span aria-hidden="true"> · </span>
+                      <span className="sr-only">, enviado em </span>
+                      <time dateTime={documento.criadoEm}>{data}</time>
+                    </>
+                  )}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 pl-13 sm:shrink-0 sm:justify-end sm:pl-0">
+              <SeloStatus validado={documento.validado} />
+
+              <a
+                href={`/documentos/${encodeURIComponent(documento.id)}/download`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={estilos.botaoSecundario}
+              >
+                <IconeAbrir className="size-4" />
+                Abrir PDF
+                <span className="sr-only">
+                  {' '}
+                  {documento.nomeOriginal} (abre em nova aba)
                 </span>
-              </td>
+              </a>
 
-              <td className="whitespace-nowrap py-3">
-                <a
-                  href={`/documentos/${encodeURIComponent(documento.id)}/download`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-medium text-blue-700 underline"
-                >
-                  Abrir PDF
-                  <span className="sr-only">
-                    {' '}
-                    {documento.nomeOriginal} (abre em nova aba)
-                  </span>
-                </a>
-                {podeValidar && (
-                  <BotaoValidarDocumento
-                    id={documento.id}
-                    nomeArquivo={documento.nomeOriginal}
-                    validado={documento.validado}
-                  />
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+              {podeValidar && (
+                <BotaoValidarDocumento
+                  id={documento.id}
+                  nomeArquivo={documento.nomeOriginal}
+                  validado={documento.validado}
+                />
+              )}
+            </div>
+          </li>
+        );
+      })}
+    </ul>
   );
 }

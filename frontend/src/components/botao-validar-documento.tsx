@@ -2,6 +2,8 @@
 
 import { useActionState } from 'react';
 import { validarDocumento } from '@/app/actions/documentos';
+import { estilos } from './ui/estilos';
+import { IconeCheck } from './ui/icones';
 
 type Props = {
   id: string;
@@ -22,31 +24,41 @@ export default function BotaoValidarDocumento({
     },
   );
 
+  // O selo de status já indica documentos validados; o botão só aparece
+  // enquanto há algo a fazer. A mensagem de sucesso continua montada para
+  // ser anunciada por leitores de tela após a lista ser atualizada.
+  if (validado && !estado.sucesso) {
+    return null;
+  }
+
   const concluido = validado || Boolean(estado.sucesso);
 
   return (
-    <form action={acao} className="mt-2 space-y-2">
+    <form action={acao} className="contents">
       <input type="hidden" name="id" value={id} />
 
-      <button
-        type="submit"
-        disabled={pendente || concluido}
-        aria-label={
-          concluido
-            ? `${nomeArquivo} validado`
-            : `Validar documento ${nomeArquivo}`
-        }
-        className="rounded bg-green-700 px-3 py-1 text-sm font-medium text-white disabled:opacity-50"
-      >
-        {pendente
-          ? 'Validando...'
-          : concluido
-            ? 'Validado'
-            : 'Validar documento'}
-      </button>
+      {!validado && (
+        <button
+          type="submit"
+          disabled={pendente || concluido}
+          aria-label={
+            concluido
+              ? `${nomeArquivo} validado`
+              : `Validar documento ${nomeArquivo}`
+          }
+          className={estilos.botaoSucesso}
+        >
+          <IconeCheck className="size-4" />
+          {pendente
+            ? 'Validando...'
+            : concluido
+              ? 'Validado'
+              : 'Validar'}
+        </button>
+      )}
 
       {estado.erro && (
-        <p role="alert" className="text-sm text-red-700">
+        <p role="alert" className="basis-full text-sm text-red-700 sm:text-right">
           {estado.erro}
         </p>
       )}

@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { COOKIE_TOKEN, urlApi } from '@/lib/auth';
+import { ehIdDocumentoValido } from '@/lib/documentos';
 
 function redirecionar(endereco: string | URL) {
   return NextResponse.redirect(endereco, {
@@ -24,6 +25,16 @@ export async function GET(
   }
 
   const { id } = await params;
+
+  if (!ehIdDocumentoValido(id)) {
+    return Response.json(
+      { erro: 'Documento não encontrado.' },
+      {
+        status: 404,
+        headers: { 'Cache-Control': 'no-store' },
+      },
+    );
+  }
 
   let resposta: Response;
 
@@ -73,7 +84,24 @@ export async function GET(
     );
   }
 
-  const download: { url: string } = await resposta.json();
+  const download: unknown = await resposta.json().catch(() => null);
+  const url =
+    typeof download === 'object' &&
+    download !== null &&
+    'url' in download &&
+    typeof download.url === 'string'
+      ? URL.parse(download.url)
+      : null;
 
-  return redirecionar(download.url);
+  if (!url || (url.protocol !== 'https:' && url.protocol !== 'http:')) {
+    return Response.json(
+      { erro: 'Não foi possível abrir o documento.' },
+      {
+        status: 502,
+        headers: { 'Cache-Control': 'no-store' },
+      },
+    );
+  }
+
+  return redirecionar(url);
 }

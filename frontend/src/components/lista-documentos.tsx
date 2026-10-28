@@ -78,10 +78,15 @@ export default function ListaDocumentos({ documentos, podeValidar = false }: Pro
                   className="font-medium text-blue-700 underline"
                 >
                   Abrir PDF
+                  <span className="sr-only">
+                    {' '}
+                    {documento.nomeOriginal} (abre em nova aba)
+                  </span>
                 </a>
                 {podeValidar && (
                   <BotaoValidarDocumento
                     id={documento.id}
+                    nomeArquivo={documento.nomeOriginal}
                     validado={documento.validado}
                   />
                 )}

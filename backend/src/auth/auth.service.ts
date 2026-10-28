@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { ConflictException, Injectable, UnauthorizedException, type OnModuleInit } from '@nestjs/common';
 import * as argon2 from 'argon2';
 import {
   Perfil,
@@ -10,6 +10,9 @@ import type { CadastroDto } from './dto/cadastro.dto.js';
 import { JwtService } from '@nestjs/jwt';
 import { randomBytes } from 'crypto';
 import { LoginDto } from './dto/login.dto.js';
+import { LimitadorLoginService } from './limitador-login.service.js';
+
+export const EXPIRACAO_TOKEN_SEGUNDOS = 900;
 
 export type UsuarioPublico = Pick<
   Usuario,
@@ -24,12 +27,13 @@ export type LoginResposta = {
 };
 
 @Injectable()
-export class AuthService {
+export class AuthService implements OnModuleInit {
   private senhaHashAlternativa: string;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
+    private readonly limitadorLogin: LimitadorLoginService,
   ) { }
 
   async onModuleInit(): Promise<void> {
@@ -86,14 +90,19 @@ export class AuthService {
       },
     });
 
+    this.limitadorLogin.verificar(dto.email);
+
     const senhaValida = await argon2.verify(
       usuario?.senhaHash ?? this.senhaHashAlternativa,
       dto.senha,
     );
 
     if (!usuario || !senhaValida) {
+      this.limitadorLogin.registrarFalha(dto.email);
       throw new UnauthorizedException('E-mail ou senha inválidos');
     }
+
+    this.limitadorLogin.registrarSucesso(dto.email);
 
     const accessToken = await this.jwtService.signAsync({
       sub: usuario.id,
@@ -110,7 +119,7 @@ export class AuthService {
     return {
       accessToken,
       tokenType: 'Bearer',
-      expiraEmSegundos: 900,
+      expiraEmSegundos: EXPIRACAO_TOKEN_SEGUNDOS,
       usuario: usuarioPublico,
     };
   }

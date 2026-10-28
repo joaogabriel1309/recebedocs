@@ -23,7 +23,7 @@ export class CadastroDto {
   email: string;
 
   @IsString()
-  @MinLength(3)
+  @MinLength(8)
   @MaxLength(128)
   senha: string;
 }

@@ -28,6 +28,8 @@ export default function LoginForm() {
           autoComplete="username"
           maxLength={254}
           required
+          aria-invalid={Boolean(estado.erro)}
+          aria-describedby={estado.erro ? 'erro-login' : undefined}
           className="w-full rounded-lg border border-zinc-300 px-3 py-2"
         />
       </div>
@@ -47,12 +49,14 @@ export default function LoginForm() {
           autoComplete="current-password"
           maxLength={128}
           required
+          aria-invalid={Boolean(estado.erro)}
+          aria-describedby={estado.erro ? 'erro-login' : undefined}
           className="w-full rounded-lg border border-zinc-300 px-3 py-2"
         />
       </div>
 
       {estado.erro && (
-        <p role="alert" className="text-sm text-red-700">
+        <p id="erro-login" role="alert" className="text-sm text-red-700">
           {estado.erro}
         </p>
       )}

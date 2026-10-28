@@ -1,8 +1,41 @@
-import { BadRequestException, Injectable, Logger, NotFoundException, PayloadTooLargeException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException, PayloadTooLargeException } from '@nestjs/common';
 import { StorageService } from '../storage/storage.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { Documento, Perfil, Prisma } from '../generated/prisma/client.js';
+import { Perfil, Prisma } from '../generated/prisma/client.js';
 import type { UsuarioPublico } from '../auth/auth.service.js';
+
+export const TAMANHO_MAXIMO_ARQUIVO = 5 * 1024 * 1024;
+export const TAMANHO_MAXIMO_LOTE = 20 * 1024 * 1024;
+export const LIMITE_ARQUIVOS_LOTE = 10;
+
+const TAMANHO_MAXIMO_NOME = 255;
+
+// A chave interna do arquivo no bucket não é exposta aos clientes.
+const camposPublicos = {
+  id: true,
+  nomeOriginal: true,
+  tamanho: true,
+  validado: true,
+  criadoEm: true,
+  usuarioId: true,
+} satisfies Prisma.DocumentoSelect;
+
+export type DocumentoPublico = Prisma.DocumentoGetPayload<{
+  select: typeof camposPublicos;
+}>;
+
+export function normalizarNomeArquivo(nome: string): string {
+  const limpo = nome
+    .normalize('NFC')
+    .replace(/[\p{Cc}\p{Cf}]/gu, '')
+    .trim();
+
+  if (!limpo) {
+    return 'documento.pdf';
+  }
+
+  return Array.from(limpo).slice(0, TAMANHO_MAXIMO_NOME).join('');
+}
 
 @Injectable()
 export class DocumentosService {
@@ -13,36 +46,46 @@ export class DocumentosService {
     private readonly prisma: PrismaService,
   ) { }
 
-  buscarTodos(usuario: UsuarioPublico): Promise<Documento[]> {
+  buscarTodos(usuario: UsuarioPublico): Promise<DocumentoPublico[]> {
     return this.prisma.documento.findMany({
       where:
         usuario.perfil === Perfil.ADMIN
           ? {}
           : { usuarioId: usuario.id },
-      orderBy: {
-        criadoEm: 'desc',
-      },
+      orderBy: [
+        { criadoEm: 'desc' },
+        { id: 'desc' },
+      ],
+      select: camposPublicos,
     });
   }
 
   async criar(
     file: Express.Multer.File,
     usuario: UsuarioPublico,
-  ): Promise<Documento> {
+  ): Promise<DocumentoPublico> {
+    if (file.size === 0) {
+      throw new BadRequestException(
+        'Não é permitido enviar arquivos vazios',
+      );
+    }
+
     const key = await this.storageService.uploadPdf(file.buffer);
 
     try {
       return await this.prisma.documento.create({
         data: {
-          nomeOriginal: file.originalname,
+          nomeOriginal: normalizarNomeArquivo(file.originalname),
           key,
           tamanho: file.size,
           usuarioId: usuario.id,
         },
+        select: camposPublicos,
       });
     } catch (erro) {
       this.logger.error(
         'Erro ao salvar o documento no banco. Iniciando limpeza.',
+        erro,
       );
 
       try {
@@ -61,10 +104,10 @@ export class DocumentosService {
   async criarLote(
     files: Express.Multer.File[],
     usuario: UsuarioPublico,
-  ): Promise<Documento[]> {
-    if (!files?.length || files.length > 10) {
+  ): Promise<DocumentoPublico[]> {
+    if (!files?.length || files.length > LIMITE_ARQUIVOS_LOTE) {
       throw new BadRequestException(
-        'Envie de 1 a 10 arquivos por vez',
+        `Envie de 1 a ${LIMITE_ARQUIVOS_LOTE} arquivos por vez`,
       );
     }
 
@@ -80,35 +123,45 @@ export class DocumentosService {
     );
 
     if (
-      files.some((file) => file.size > 5 * 1024 * 1024) ||
-      tamanhoTotal > 20 * 1024 * 1024
+      files.some((file) => file.size > TAMANHO_MAXIMO_ARQUIVO) ||
+      tamanhoTotal > TAMANHO_MAXIMO_LOTE
     ) {
       throw new PayloadTooLargeException(
         'O limite é 5 MB por arquivo e 20 MB por envio',
       );
     }
 
-    const chavesEnviadas: string[] = [];
-    const dados: Prisma.DocumentoCreateManyInput[] = [];
+    // Os uploads correm em paralelo; allSettled garante que conhecemos
+    // todas as chaves gravadas, mesmo quando parte deles falha.
+    const uploads = await Promise.allSettled(
+      files.map((file) => this.storageService.uploadPdf(file.buffer)),
+    );
+
+    const chavesEnviadas = uploads.flatMap((upload) =>
+      upload.status === 'fulfilled' ? [upload.value] : [],
+    );
 
     try {
-      for (const file of files) {
-        const key = await this.storageService.uploadPdf(
-          file.buffer,
-        );
+      const falhaUpload = uploads.find(
+        (upload) => upload.status === 'rejected',
+      );
 
-        chavesEnviadas.push(key);
+      if (falhaUpload) {
+        throw falhaUpload.reason;
+      }
 
-        dados.push({
-          nomeOriginal: file.originalname,
-          key,
+      const dados: Prisma.DocumentoCreateManyInput[] = files.map(
+        (file, indice) => ({
+          nomeOriginal: normalizarNomeArquivo(file.originalname),
+          key: chavesEnviadas[indice],
           tamanho: file.size,
           usuarioId: usuario.id,
-        });
-      }
+        }),
+      );
 
       return await this.prisma.documento.createManyAndReturn({
         data: dados,
+        select: camposPublicos,
       });
     } catch (erro) {
       this.logger.error(
@@ -150,7 +203,10 @@ export class DocumentosService {
       throw new NotFoundException('Documento não encontrado');
     }
 
-    const download = await this.storageService.gerarUrlDownload(documento.key);
+    const download = await this.storageService.gerarUrlDownload(
+      documento.key,
+      documento.nomeOriginal,
+    );
 
     return {
       id: documento.id,
@@ -162,26 +218,29 @@ export class DocumentosService {
 
   async validaDocumento(id: string, usuario: UsuarioPublico) {
     if (usuario.perfil !== Perfil.ADMIN) {
-      throw new NotFoundException('Somente administradores podem validar documentos');
+      throw new ForbiddenException('Somente administradores podem validar documentos');
     }
 
-    const documento = await this.prisma.documento.findUnique({
-      where: { id }
-    });
-
-    if (!documento) {
-      throw new NotFoundException('Documento não encontrado');
-    }
-
-    await this.prisma.documento.update({
-      where: { id },
-      data: {
-        validado: true,
-      },
-      select: {
-        id: true,
-        validado: true,
+    try {
+      return await this.prisma.documento.update({
+        where: { id },
+        data: {
+          validado: true,
+        },
+        select: {
+          id: true,
+          validado: true,
+        }
+      });
+    } catch (erro) {
+      if (
+        erro instanceof Prisma.PrismaClientKnownRequestError &&
+        erro.code === 'P2025'
+      ) {
+        throw new NotFoundException('Documento não encontrado');
       }
-    })
+
+      throw erro;
+    }
   }
 }

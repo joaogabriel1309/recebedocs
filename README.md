@@ -14,7 +14,8 @@ Projeto de estudo para receber e organizar documentos em PDF.
 
 ## Como executar
 
-É necessário ter Node.js e npm instalados.
+É necessário ter Node.js, npm e Docker instalados, além de um bucket
+Cloudflare R2 (ou outro serviço compatível com S3).
 
 ### Back-end
 
@@ -22,7 +23,11 @@ Na raiz do projeto:
 
 ```powershell
 cd backend
+copy .env.example .env   # preencha os valores
 npm install
+docker compose up -d     # PostgreSQL local
+npx prisma migrate deploy --config prisma7.config.ts
+npx prisma generate --config prisma7.config.ts
 npm run start:dev
 ```
 
@@ -34,6 +39,7 @@ Em outro terminal, começando na raiz do projeto:
 
 ```powershell
 cd frontend
+copy .env.example .env.local
 npm install
 npm run dev -- --port 3001
 ```

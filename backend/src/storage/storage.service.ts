@@ -4,6 +4,22 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'crypto';
 
+// Exibe o PDF no navegador com o nome original ao salvar (RFC 6266/5987).
+export function montarContentDisposition(nomeArquivo: string): string {
+  const nomeAscii = nomeArquivo
+    .normalize('NFKD')
+    .replace(/[^\x20-\x7e]/g, '')
+    .replace(/["\\]/g, '')
+    .trim() || 'documento.pdf';
+
+  const nomeCodificado = encodeURIComponent(nomeArquivo).replace(
+    /['()*]/g,
+    (caractere) => `%${caractere.charCodeAt(0).toString(16).toUpperCase()}`,
+  );
+
+  return `inline; filename="${nomeAscii}"; filename*=UTF-8''${nomeCodificado}`;
+}
+
 @Injectable()
 export class StorageService {
   private readonly client: S3Client;
@@ -46,7 +62,7 @@ export class StorageService {
     );
   }
 
-  async gerarUrlDownload(key: string) {
+  async gerarUrlDownload(key: string, nomeArquivo?: string) {
     const expiraEmSegundos = 300;
 
     const url = await getSignedUrl(
@@ -54,6 +70,10 @@ export class StorageService {
       new GetObjectCommand({
         Bucket: this.bucket,
         Key: key,
+        ResponseContentType: 'application/pdf',
+        ResponseContentDisposition: nomeArquivo
+          ? montarContentDisposition(nomeArquivo)
+          : undefined,
       }),
       { expiresIn: expiraEmSegundos },
     );

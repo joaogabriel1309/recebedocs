@@ -60,17 +60,27 @@ export async function entrar(
     };
   }
 
+  if (resposta.status === 429) {
+    return {
+      erro: 'Muitas tentativas de login. Aguarde alguns minutos e tente novamente.',
+    };
+  }
+
   if (!resposta.ok) {
     return {
       erro: 'Não foi possível entrar agora. Tente novamente.',
     };
   }
 
-  const dados: RespostaLogin = await resposta.json();
+  const dados: Partial<RespostaLogin> | null = await resposta
+    .json()
+    .catch(() => null);
 
   if (
+    !dados ||
     typeof dados.accessToken !== 'string' ||
     !dados.accessToken ||
+    typeof dados.expiraEmSegundos !== 'number' ||
     !Number.isInteger(dados.expiraEmSegundos) ||
     dados.expiraEmSegundos <= 0
   ) {

@@ -6,8 +6,9 @@ import {
 } from '@nestjs/jwt';
 import { PrismaModule } from '../prisma/prisma.module.js';
 import { AuthController } from './auth.controller.js';
-import { AuthService } from './auth.service.js';
+import { AuthService, EXPIRACAO_TOKEN_SEGUNDOS } from './auth.service.js';
 import { JwtAuthGuard } from './jwt-auth.guard.js';
+import { LimitadorLoginService } from './limitador-login.service.js';
 
 @Module({
   imports: [
@@ -19,7 +20,7 @@ import { JwtAuthGuard } from './jwt-auth.guard.js';
         secret: config.getOrThrow<string>('JWT_SECRET'),
         signOptions: {
           algorithm: 'HS256',
-          expiresIn: 900,
+          expiresIn: EXPIRACAO_TOKEN_SEGUNDOS,
           issuer: 'recebedocs-api',
           audience: 'recebedocs',
         },
@@ -32,7 +33,7 @@ import { JwtAuthGuard } from './jwt-auth.guard.js';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtAuthGuard],
+  providers: [AuthService, JwtAuthGuard, LimitadorLoginService],
   exports: [JwtModule, JwtAuthGuard],
 })
 export class AuthModule { }

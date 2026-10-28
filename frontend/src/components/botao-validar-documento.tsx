@@ -5,11 +5,13 @@ import { validarDocumento } from '@/app/actions/documentos';
 
 type Props = {
   id: string;
+  nomeArquivo: string;
   validado: boolean;
 };
 
 export default function BotaoValidarDocumento({
   id,
+  nomeArquivo,
   validado,
 }: Props) {
   const [estado, acao, pendente] = useActionState(
@@ -23,12 +25,17 @@ export default function BotaoValidarDocumento({
   const concluido = validado || Boolean(estado.sucesso);
 
   return (
-    <form action={acao} className="space-y-2">
+    <form action={acao} className="mt-2 space-y-2">
       <input type="hidden" name="id" value={id} />
 
       <button
         type="submit"
         disabled={pendente || concluido}
+        aria-label={
+          concluido
+            ? `${nomeArquivo} validado`
+            : `Validar documento ${nomeArquivo}`
+        }
         className="rounded bg-green-700 px-3 py-1 text-sm font-medium text-white disabled:opacity-50"
       >
         {pendente
@@ -41,6 +48,12 @@ export default function BotaoValidarDocumento({
       {estado.erro && (
         <p role="alert" className="text-sm text-red-700">
           {estado.erro}
+        </p>
+      )}
+
+      {estado.sucesso && (
+        <p role="status" className="sr-only">
+          {estado.sucesso}
         </p>
       )}
     </form>

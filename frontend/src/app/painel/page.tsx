@@ -124,7 +124,11 @@ async function ConteudoPainel() {
       )}
 
       <Suspense
-        fallback={<p className="mt-8">Carregando documentos...</p>}
+        fallback={
+          <p role="status" className="mt-8">
+            Carregando documentos...
+          </p>
+        }
       >
         {usuario.perfil === 'ADMIN' ? (
           <DocumentosAdmin />

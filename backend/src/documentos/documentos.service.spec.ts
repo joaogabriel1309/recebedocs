@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { getQueueToken } from '@nestjs/bullmq';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { DocumentosService, normalizarNomeArquivo } from './documentos.service.js';
 import { StorageService } from '../storage/storage.service.js';
@@ -69,6 +70,10 @@ describe('DocumentosService', () => {
         DocumentosService,
         { provide: StorageService, useValue: storage },
         { provide: PrismaService, useValue: prisma },
+        {
+          provide: getQueueToken('analise-documentos'),
+          useValue: { addBulk: vi.fn() },
+        },
       ],
     }).compile();
 

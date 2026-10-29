@@ -65,11 +65,24 @@ export default function ListaDocumentos({
                     </>
                   )}
                 </p>
+
+                {!documento.validado &&
+                  documento.statusAnalise === 'RECUSADO' &&
+                  documento.motivoAnalise && (
+                    <p className="mt-1 text-xs text-red-700">
+                      <span className="sr-only">Motivo da recusa: </span>
+                      {documento.motivoAnalise}
+                    </p>
+                  )}
               </div>
             </div>
 
             <div className="flex flex-wrap items-center gap-2 pl-13 sm:shrink-0 sm:justify-end sm:pl-0">
-              <SeloStatus validado={documento.validado} />
+              <SeloStatus
+                validado={documento.validado}
+                statusAnalise={documento.statusAnalise}
+                admin={podeValidar}
+              />
 
               <a
                 href={`/documentos/${encodeURIComponent(documento.id)}/download`}
@@ -85,7 +98,9 @@ export default function ListaDocumentos({
                 </span>
               </a>
 
-              {podeValidar && (
+              {/* Enquanto a IA analisa não há o que validar; um documento
+                  recusado ainda pode ser validado, pois a IA pode errar. */}
+              {podeValidar && documento.statusAnalise !== 'PENDENTE' && (
                 <BotaoValidarDocumento
                   id={documento.id}
                   nomeArquivo={documento.nomeOriginal}

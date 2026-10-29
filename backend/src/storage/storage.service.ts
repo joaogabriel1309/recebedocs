@@ -80,4 +80,12 @@ export class StorageService {
 
     return { url, expiraEmSegundos }
   }
+
+  async baixar(key: string): Promise<Buffer> {
+    const resposta = await this.client.send(
+      new GetObjectCommand({ Bucket: this.bucket, Key: key }),
+    );
+
+    return Buffer.from(await resposta.Body!.transformToByteArray());
+  }
 }

@@ -1,9 +1,10 @@
-import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException, PayloadTooLargeException, UnprocessableEntityException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException, PayloadTooLargeException } from '@nestjs/common';
 import { StorageService } from '../storage/storage.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { Perfil, Prisma } from '../generated/prisma/client.js';
 import type { UsuarioPublico } from '../auth/auth.service.js';
-import { ClassificadorService } from '../ia/classificador.service.js';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 
 export const TAMANHO_MAXIMO_ARQUIVO = 5 * 1024 * 1024;
 export const TAMANHO_MAXIMO_LOTE = 20 * 1024 * 1024;
@@ -17,6 +18,8 @@ const camposPublicos = {
   nomeOriginal: true,
   tamanho: true,
   validado: true,
+  statusAnalise: true,
+  motivoAnalise: true,
   criadoEm: true,
   usuarioId: true,
 } satisfies Prisma.DocumentoSelect;
@@ -49,7 +52,7 @@ export class DocumentosService {
   constructor(
     private readonly storageService: StorageService,
     private readonly prisma: PrismaService,
-    private readonly classificador: ClassificadorService,
+    @InjectQueue('analise-documentos') private readonly filaAnalise: Queue,
   ) { }
 
   buscarTodos(usuario: UsuarioPublico): Promise<DocumentoPublico[]> {
@@ -82,18 +85,12 @@ export class DocumentosService {
       );
     }
 
-    const analise = await this.classificador.classificar(file.buffer);
-
-    if (analise && !analise.comprovante && analise.confianca !== 'baixa') {
-      throw new UnprocessableEntityException(
-        `Documento recusado ${analise.motivo}`,
-      )
-    }
-
     const key = await this.storageService.uploadPdf(file.buffer);
 
+    let documento: DocumentoPublico;
+
     try {
-      return await this.prisma.documento.create({
+      documento = await this.prisma.documento.create({
         data: {
           nomeOriginal: normalizarNomeArquivo(file.originalname),
           key,
@@ -119,6 +116,10 @@ export class DocumentosService {
 
       throw erro;
     }
+
+    await this.enfileirarAnalise([documento.id]);
+
+    return documento;
   }
 
   async criarLote(
@@ -161,22 +162,23 @@ export class DocumentosService {
       );
     }
 
-    const analises = await Promise.all(
-      files.map((file) => this.classificador.classificar(file.buffer)),
-    );
+    // const analises = await Promise.all(
+    //   files.map((file) => this.classificador.classificar(file.buffer)),
+    // );
 
-    const recusados = files.filter((_, indice) => {
-      const analise = analises[indice];
-      return analise && !analise.comprovante && analise.confianca !== 'baixa';
-    });
+    // const recusados = files.filter((_, indice) => {
+    //   const analise = analises[indice];
+    //   return analise && !analise.comprovante && analise.confianca !== 'baixa';
+    // });
 
-    if (recusados.length) {
-      throw new UnprocessableEntityException(
-        `Documentos recusados por não serem comprovantes: ${recusados
-          .map((file) => normalizarNomeArquivo(file.originalname))
-          .join(', ')}`,
-      );
-    }
+    // if (recusados.length) {
+    //   throw new UnprocessableEntityException(
+    //     `Documentos recusados por não serem comprovantes: ${recusados
+    //       .map((file) => normalizarNomeArquivo(file.originalname))
+    //       .join(', ')}`,
+    //   );
+    // }
+
 
 
     // Os uploads correm em paralelo; allSettled garante que conhecemos
@@ -207,10 +209,14 @@ export class DocumentosService {
         }),
       );
 
-      return await this.prisma.documento.createManyAndReturn({
+      const documento = await this.prisma.documento.createManyAndReturn({
         data: dados,
         select: camposPublicos,
       });
+
+      await this.enfileirarAnalise(documento.map((documento) => documento.id));
+
+      return documento;
     } catch (erro) {
       this.logger.error(
         'Falha ao salvar o lote de documentos. Iniciando limpeza.',
@@ -291,4 +297,19 @@ export class DocumentosService {
       throw erro;
     }
   }
+
+  private async enfileirarAnalise(ids: string[]) {
+    try {
+      await this.filaAnalise.addBulk(
+        ids.map((id) => ({
+          name: 'analisar',
+          data: { documentoId: id },
+          opts: { jobId: id },
+        })),
+      );
+    } catch (erro) {
+      this.logger.error(`Falha ao enfileirar a análise de ${ids.join(', ')}`, erro);
+    }
+  }
+
 }

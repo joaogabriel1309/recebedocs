@@ -3,9 +3,12 @@ import { sair } from '@/app/actions/auth';
 import ListaDocumentos from '@/components/lista-documentos';
 import { obterUsuario, type UsuarioAutenticado } from '@/lib/auth';
 import {
+  aguardaValidacao,
   listarDocumentos,
   listarDocumentosPorUsuario,
+  type DocumentoResumo,
 } from '@/lib/documentos';
+import AtualizacaoAutomatica from '@/components/atualizacao-automatica';
 import FormularioEnvio from '@/components/formulario-envio';
 import ResumoDocumentos from '@/components/resumo-documentos';
 import Logo from '@/components/ui/logo';
@@ -26,6 +29,10 @@ function Avatar({ nome, pequeno = false }: { nome: string; pequeno?: boolean }) 
   );
 }
 
+function temEmAnalise(documentos: DocumentoResumo[]) {
+  return documentos.some((documento) => documento.statusAnalise === 'PENDENTE');
+}
+
 function Esqueleto({ className }: { className: string }) {
   return (
     <div
@@ -39,8 +46,9 @@ function EsqueletoLista() {
   return (
     <div role="status" className="space-y-4">
       <span className="sr-only">Carregando documentos...</span>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
-        <Esqueleto className="col-span-2 h-20 sm:col-span-1" />
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
+        <Esqueleto className="h-20" />
+        <Esqueleto className="h-20" />
         <Esqueleto className="h-20" />
         <Esqueleto className="h-20" />
       </div>
@@ -54,6 +62,8 @@ async function DocumentosUsuario() {
 
   return (
     <div className="space-y-6">
+      <AtualizacaoAutomatica ativa={temEmAnalise(documentos)} />
+
       <ResumoDocumentos documentos={documentos} />
 
       <section
@@ -95,6 +105,8 @@ async function DocumentosAdmin() {
 
   return (
     <div className="space-y-6">
+      <AtualizacaoAutomatica ativa={temEmAnalise(documentos)} />
+
       <ResumoDocumentos
         documentos={documentos}
         totalUsuarios={grupos.length}
@@ -118,8 +130,9 @@ async function DocumentosAdmin() {
         )}
 
         {grupos.map((grupo) => {
-          const pendentes = grupo.documentos.filter(
-            (documento) => !documento.validado,
+          const pendentes = grupo.documentos.filter(aguardaValidacao).length;
+          const emAnalise = grupo.documentos.filter(
+            (documento) => documento.statusAnalise === 'PENDENTE',
           ).length;
 
           return (
@@ -151,15 +164,23 @@ async function DocumentosAdmin() {
                     Documentos enviados: {grupo.totalDocumentos}
                   </span>
 
+                  {emAnalise > 0 && (
+                    <span className="rounded-full bg-blue-50 px-2.5 py-1 text-blue-800 ring-1 ring-blue-600/20 ring-inset">
+                      {emAnalise} em análise
+                    </span>
+                  )}
+
                   {pendentes > 0 ? (
                     <span className="rounded-full bg-amber-50 px-2.5 py-1 text-amber-800 ring-1 ring-amber-600/25 ring-inset">
                       {pendentes}{' '}
                       {pendentes === 1 ? 'pendente' : 'pendentes'}
                     </span>
                   ) : (
-                    <span className="rounded-full bg-green-50 px-2.5 py-1 text-green-800 ring-1 ring-green-600/20 ring-inset">
-                      Tudo validado
-                    </span>
+                    emAnalise === 0 && (
+                      <span className="rounded-full bg-green-50 px-2.5 py-1 text-green-800 ring-1 ring-green-600/20 ring-inset">
+                        Tudo validado
+                      </span>
+                    )
                   )}
                 </div>
               </header>

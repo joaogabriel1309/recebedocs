@@ -100,10 +100,19 @@ export async function enviarDocumentos(
     };
   }
 
-  if (resposta.status === 400 || resposta.status === 422) {
+  if (resposta.status === 400) {
+    // O backend explica o motivo (por exemplo, PDFs protegidos por senha).
+    const corpo: unknown = await resposta.json().catch(() => null);
+    const mensagem =
+      corpo && typeof corpo === 'object' && 'message' in corpo
+        ? corpo.message
+        : null;
+
     return {
       erro:
-        'Lote inválido. Confira se todos os arquivos são PDFs válidos e se há no máximo 10 arquivos.',
+        typeof mensagem === 'string'
+          ? mensagem
+          : 'Lote inválido. Confira se todos os arquivos são PDFs válidos e se há no máximo 10 arquivos.',
       sucesso: '',
     };
   }
@@ -121,8 +130,8 @@ export async function enviarDocumentos(
     erro: '',
     sucesso:
       arquivos.length === 1
-        ? 'Documento enviado com sucesso!'
-        : `${arquivos.length} documentos enviados com sucesso!`,
+        ? 'Documento enviado! Ele está em análise e o status será atualizado em instantes.'
+        : `${arquivos.length} documentos enviados! Eles estão em análise e o status será atualizado em instantes.`,
   };
 }
 

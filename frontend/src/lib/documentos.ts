@@ -4,13 +4,30 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { COOKIE_TOKEN, urlApi } from '@/lib/auth';
 
+export type StatusAnalise =
+  | 'PENDENTE'
+  | 'APROVADO'
+  | 'RECUSADO'
+  | 'REVISAO_MANUAL';
+
 export type DocumentoResumo = {
   id: string;
   nomeOriginal: string;
   tamanho: number;
   validado: boolean;
+  statusAnalise: StatusAnalise;
+  motivoAnalise: string | null;
   criadoEm: string;
 };
+
+// Documentos que o admin já pode validar: a IA terminou e não recusou.
+export function aguardaValidacao(documento: DocumentoResumo): boolean {
+  return (
+    !documento.validado &&
+    documento.statusAnalise !== 'PENDENTE' &&
+    documento.statusAnalise !== 'RECUSADO'
+  );
+}
 
 type DocumentoComUsuario = DocumentoResumo & {
   usuarioId: string | null;

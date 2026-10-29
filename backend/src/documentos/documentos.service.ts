@@ -1,8 +1,9 @@
-import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException, PayloadTooLargeException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException, PayloadTooLargeException, UnprocessableEntityException } from '@nestjs/common';
 import { StorageService } from '../storage/storage.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { Perfil, Prisma } from '../generated/prisma/client.js';
 import type { UsuarioPublico } from '../auth/auth.service.js';
+import { ClassificadorService } from '../ia/classificador.service.js';
 
 export const TAMANHO_MAXIMO_ARQUIVO = 5 * 1024 * 1024;
 export const TAMANHO_MAXIMO_LOTE = 20 * 1024 * 1024;
@@ -37,6 +38,10 @@ export function normalizarNomeArquivo(nome: string): string {
   return Array.from(limpo).slice(0, TAMANHO_MAXIMO_NOME).join('');
 }
 
+export function pdfProtegidoPorSenha(buffer: Buffer): boolean {
+  return buffer.includes('/Encrypt');
+}
+
 @Injectable()
 export class DocumentosService {
   private readonly logger = new Logger(DocumentosService.name);
@@ -44,6 +49,7 @@ export class DocumentosService {
   constructor(
     private readonly storageService: StorageService,
     private readonly prisma: PrismaService,
+    private readonly classificador: ClassificadorService,
   ) { }
 
   buscarTodos(usuario: UsuarioPublico): Promise<DocumentoPublico[]> {
@@ -68,6 +74,20 @@ export class DocumentosService {
       throw new BadRequestException(
         'Não é permitido enviar arquivos vazios',
       );
+    }
+
+    if (pdfProtegidoPorSenha(file.buffer)) {
+      throw new BadRequestException(
+        'O PDF está protegido por senha. Remova a senha e envie novamente.',
+      );
+    }
+
+    const analise = await this.classificador.classificar(file.buffer);
+
+    if (analise && !analise.comprovante && analise.confianca !== 'baixa') {
+      throw new UnprocessableEntityException(
+        `Documento recusado ${analise.motivo}`,
+      )
     }
 
     const key = await this.storageService.uploadPdf(file.buffer);
@@ -117,6 +137,16 @@ export class DocumentosService {
       );
     }
 
+    const protegidos = files.filter((file) => pdfProtegidoPorSenha(file.buffer));
+
+    if (protegidos.length) {
+      throw new BadRequestException(
+        `Estes PDFs estão protegidos por senha: ${protegidos
+          .map((file) => normalizarNomeArquivo(file.originalname))
+          .join(', ')}. Remova a senha e envie novamente.`,
+      );
+    }
+
     const tamanhoTotal = files.reduce(
       (total, file) => total + file.size,
       0,
@@ -130,6 +160,24 @@ export class DocumentosService {
         'O limite é 5 MB por arquivo e 20 MB por envio',
       );
     }
+
+    const analises = await Promise.all(
+      files.map((file) => this.classificador.classificar(file.buffer)),
+    );
+
+    const recusados = files.filter((_, indice) => {
+      const analise = analises[indice];
+      return analise && !analise.comprovante && analise.confianca !== 'baixa';
+    });
+
+    if (recusados.length) {
+      throw new UnprocessableEntityException(
+        `Documentos recusados por não serem comprovantes: ${recusados
+          .map((file) => normalizarNomeArquivo(file.originalname))
+          .join(', ')}`,
+      );
+    }
+
 
     // Os uploads correm em paralelo; allSettled garante que conhecemos
     // todas as chaves gravadas, mesmo quando parte deles falha.
